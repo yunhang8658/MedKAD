@@ -9,8 +9,12 @@ REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 VERL_SOURCE_DIR="${REPO_DIR}"
 CODE_DIR="$(dirname "${REPO_DIR}")"
 WORKSPACE_DIR="$(dirname "${CODE_DIR}")"
-CONDA_ENV_DIR="${CONDA_ENV_DIR:-${WORKSPACE_DIR}/miniconda3/envs/verl}"
-PYTHON_BIN="${PYTHON_BIN:-${CONDA_ENV_DIR}/bin/python}"
+if [[ -n "${PYTHON_BIN:-}" ]]; then
+    CONDA_ENV_DIR="${CONDA_ENV_DIR:-$(dirname "$(dirname "$PYTHON_BIN")")}" 
+else
+    CONDA_ENV_DIR="${CONDA_ENV_DIR:-${WORKSPACE_DIR}/miniconda3/envs/verl}"
+    PYTHON_BIN="${CONDA_ENV_DIR}/bin/python"
+fi
 cd "$REPO_DIR"
 
 : "${TRAIN_DATASET:?Task launcher must set TRAIN_DATASET}"
@@ -105,14 +109,6 @@ export VLLM_GPU_MEMORY_UTILIZATION="${VLLM_GPU_MEMORY_UTILIZATION:-0.20}"
 export PPO_MAX_TOKEN_LEN_PER_GPU="${PPO_MAX_TOKEN_LEN_PER_GPU:-12888}"
 export VLLM_MAX_NUM_BATCHED_TOKENS="${VLLM_MAX_NUM_BATCHED_TOKENS:-$MAX_MODEL_LEN}"
 
-# The clean-OPD format1 arm adds the historical sampled-token format loss.
-export ENABLE_FORMAT_REWARD="${ENABLE_FORMAT_REWARD:-False}"
-export FORMAT_LOSS_WEIGHT="${FORMAT_LOSS_WEIGHT:-0.0}"
-if [[ "$FORMAT_LOSS_WEIGHT" != 0.0 && "$FORMAT_LOSS_WEIGHT" != 0 ]]; then
-    [[ "$ENABLE_FORMAT_REWARD" == True ]] || {
-        echo "FORMAT_LOSS_WEIGHT requires ENABLE_FORMAT_REWARD=True" >&2; exit 2;
-    }
-fi
 [[ "${ENABLE_THINK_REWARD:-False}" == False && "${THINK_LOSS_WEIGHT:-0.0}" == 0.0 ]] || { echo "MedKAD does not use think loss" >&2; exit 2; }
 export ENABLE_THINK_REWARD=False THINK_LOSS_WEIGHT=0.0
 
@@ -328,7 +324,6 @@ HYDRA_RUN_DIR="${HYDRA_RUN_DIR:-${REPO_DIR}/outputs/hydra/${RUN_NAME}_$(date +%Y
     actor_rollout_ref.ref.log_prob_use_dynamic_bsz=True \
     reward_model.enable=True \
     +reward_model.inject_mode="$INJECT_MODE" \
-    +reward_model.reward_kwargs.enable_format_reward="$ENABLE_FORMAT_REWARD" \
     +reward_model.reward_kwargs.enable_think_reward="$ENABLE_THINK_REWARD" \
     reward_model.model.path="$REWARD_MODEL_PATH" \
     reward_model.model.input_tokenizer=null \
