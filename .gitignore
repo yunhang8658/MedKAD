@@ -1,0 +1,12 @@
+__pycache__/
+.pytest_cache/
+.cache/
+logs/
+outputs/
+checkpoints/
+validation_log/
+wandb/
+swanlog/
+*.parquet
+*.pt
+*.safetensors

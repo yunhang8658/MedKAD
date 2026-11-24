@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+: "${TRAIN_DATASET:?Set TRAIN_DATASET to the CT training Parquet file}"
+: "${TEST_DATASET_PATH:?Set TEST_DATASET_PATH to the CT test Parquet file}"
+: "${ACTOR_MODEL_PATH:?Set ACTOR_MODEL_PATH to the Qwen3-VL student model}"
+: "${REWARD_MODEL_PATH:?Set REWARD_MODEL_PATH to the Qwen3-VL teacher model}"
+: "${PYTHON_BIN:?Set PYTHON_BIN to the training Python executable}"
+export TRAIN_DATASET_NAME=OmniMedVQA_CT TASK_DISPLAY_NAME=CT NEW_OPD_LOG_ACTIVE=1
+export ADV_ESTIMATOR=KALIGN_OPD KALIGN_ENABLED=1 KALIGN_UNION_TOPK=1 KALIGN_SCORE_MODE=cosine
+export INJECT_MODE=knowledge_gt_contrastive GT_INJECT_SCHEDULE=constant GT_INJECT_RATIO=1.0
+export CUDA_VISIBLE_DEVICES="${CUDA_VISIBLE_DEVICES:-0,1,2,3,4,5,6,7}"
+export TRAINER_N_GPUS_PER_NODE=8 MINI_BATCH_SIZE=512 N_RESPONSES=8 TOTAL_TRAINING_STEPS=400
+export LEARNING_RATE=3e-6 LR_WARMUP_STEPS=20 LOG_PROB_TOP_K=16 TOP_K_STRATEGY=only_stu
+export TEST_FREQ=10 VAL_BEFORE_TRAIN=True VAL_N=3 MAX_VAL_RESP_LENGTH=1024
+export ENABLE_FORMAT_REWARD=True FORMAT_LOSS_WEIGHT=1.0 USE_SWANLAB=False
+export PROJECT_NAME=MedKAD RUN_NAME="MedKAD_CT_$(date -u +%Y%m%d_%H%M%S)"
+export RAY_PORT="${RAY_PORT:-6430}"
+mkdir -p "$ROOT/logs"
+bash "$ROOT/MedKAD/run_medkad.sh" 2>&1 | tee "$ROOT/logs/$RUN_NAME.log"
